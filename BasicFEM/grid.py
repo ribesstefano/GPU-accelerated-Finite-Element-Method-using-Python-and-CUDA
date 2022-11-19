@@ -2,11 +2,31 @@ import numpy as np
 
 class Grid:
     def __init__(self, nodes, cells, nodesets):
-        self.nodes = nodes # list of np.ndarray
-        self.cells = cells # list of Int Tuples (node numbers)
-        self.nodesets = nodesets # dict of string to list of Ints (node numbers)
+        """Initialized Grid class.
+        
+        Models a grid structure.... Each node has a set of coordinates (either
+        2D or 3D). Cells are a collection of three node IDs.
+
+        Args:
+            nodes (list): List of np.ndarray
+            cells (list): List of Int Tuples, i.e. node IDs
+            nodesets (dict): Dictionary of string to list of Ints (node numbers)
+        """
+        self.nodes = nodes
+        self.cells = cells
+        self.nodesets = nodesets
     
     def getcoordinates(self, xe, cellid):
+        """Given a cell ID, update the coordinates of the nodes in that cell.
+        
+        Args:
+            xe (np.ndarray): List of elements coordinates, i.e. nodes defining
+                a cell. Shape: (n_nodes_per_cell, n_dimensions)
+            cellid (int): Progressive index ID of the cells in the model
+        
+        Returns:
+            Tuple: List of elements coordinates of the specified cell
+        """
         nodes = self.cells[cellid]
         for (i, nodeid) in enumerate(nodes):
             xe[i] = self.nodes[nodeid]
@@ -16,7 +36,19 @@ class Grid:
         return len(self.cells[0])
 
 class DofHandler:
+    """Associated to each node: one node can have multiple DoF.
+    
+    DoF is a single "scalar" entity...
+    
+    Attributes:
+        ndofs_per_node (TYPE): Description
+    """
     def __init__(self, ndofs_per_node):
+        """Initializes DofHandler class.
+        
+        Args:
+            ndofs_per_node (TYPE): Description
+        """
         self.ndofs_per_node = ndofs_per_node
 
     def ndofs_total(self, grid):
