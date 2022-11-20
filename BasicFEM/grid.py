@@ -1,20 +1,32 @@
 import numpy as np
+import cupy as cp
 
 class Grid:
-    def __init__(self, nodes, cells, nodesets):
+    # def __init__(self, nodes, cells, nodesets=None, bottom_nodes=None, left_nodes=None, top_nodes=None):
+    def __init__(self, nodes, cells, device='cpu'):
         """Initialized Grid class.
         
         Models a grid structure.... Each node has a set of coordinates (either
         2D or 3D). Cells are a collection of three node IDs.
-
+        
         Args:
             nodes (list): List of np.ndarray
             cells (list): List of Int Tuples, i.e. node IDs
             nodesets (dict): Dictionary of string to list of Ints (node numbers)
+            bottom_nodes (list): List of indexes of the bottom nodes
+            left_nodes (list): List of indexes of the left nodes
+            top_nodes (list): List of indexes of the bottom nodes
         """
-        self.nodes = nodes
-        self.cells = cells
-        self.nodesets = nodesets
+        if device == 'gpu':
+            self.nodes = cp.asarray(nodes)
+            self.cells = cp.asarray(cells)
+        else:
+            self.nodes = nodes
+            self.cells = cells
+        # self.nodesets = nodesets
+        # self.bottom_nodes = bottom_nodes
+        # self.left_nodes = left_nodes
+        # self.top_nodes = top_nodes
     
     def getcoordinates(self, xe, cellid):
         """Given a cell ID, update the coordinates of the nodes in that cell.
@@ -43,13 +55,14 @@ class DofHandler:
     Attributes:
         ndofs_per_node (TYPE): Description
     """
-    def __init__(self, ndofs_per_node):
+    def __init__(self, ndofs_per_node, grid=None):
         """Initializes DofHandler class.
         
         Args:
             ndofs_per_node (TYPE): Description
         """
         self.ndofs_per_node = ndofs_per_node
+        self.grid = grid
 
     def ndofs_total(self, grid):
         nnodes = grid.nodes.shape[0]
@@ -62,7 +75,8 @@ class DofHandler:
         n = self.ndofs_per_node
         for (i, nodeid) in enumerate(grid.cells[cellid]):
             for d in range(n):
-                dofs[i*n+d] = nodeid * n + d
+                dofs[i * n + d] = nodeid * n + d
+        return dofs
     
     def sparsity_pattern(self, grid):
         ndofs_cell = self.ndofs_per_cell(grid)

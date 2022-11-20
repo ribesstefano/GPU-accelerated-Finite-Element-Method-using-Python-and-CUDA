@@ -8,9 +8,10 @@ def test_grid():
     |    \ |
     0 ---- 1
     """
-    nodes = np.array([np.arange(4.0), np.arange(4.0)]).transpose()
+    nodes = np.array([np.arange(4.0), np.arange(4.0)], dtype=np.float32).T
     cells = [(0,1,2), (1,3,2)]
-    grid = Grid(nodes, cells, None)
+    cells = np.array(cells, dtype=np.int32)
+    grid = Grid(nodes, cells)
     xe = np.empty((3,2))
     grid.getcoordinates(xe, 1)
     assert np.array_equal(xe, np.array([[1., 1.], [3., 3.], [2., 2.]]))
