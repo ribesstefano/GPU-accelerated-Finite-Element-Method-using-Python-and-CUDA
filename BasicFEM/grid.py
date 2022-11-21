@@ -1,4 +1,5 @@
 import numpy as np
+import pygmsh
 
 class Grid:
     def __init__(self, nodes, cells, nodesets):
@@ -66,7 +67,8 @@ class DofHandler:
     
     def sparsity_pattern(self, grid):
         ndofs_cell = self.ndofs_per_cell(grid)
-        dofs = [0 for i in range(ndofs_cell)]
+        # dofs = [0 for i in range(ndofs_cell)]
+        dofs = np.zeros(ndofs_cell, int)
         I = []
         J = []
         for cellid in range(len(grid.cells)):
@@ -83,3 +85,42 @@ class DofHandler:
             for d in range(n):
                 dofs[i, d] = nodeid * n + d
         return dofs  
+
+
+def generate_grid(lcar=0.1):
+    with pygmsh.geo.Geometry() as geom:
+        #lcar = 0.1
+        p0 = geom.add_point([0.0, 0.0], lcar)
+        p1 = geom.add_point([1.0, 0.0], lcar)
+        p2 = geom.add_point([2.0, 0.0], lcar)
+        p3 = geom.add_point([2.0, 2.0], lcar)
+        p4 = geom.add_point([0.0, 2.0], lcar)
+        p5 = geom.add_point([0.0, 1.0], lcar)
+        
+        l0 = geom.add_line(p1, p2) 
+        l1 = geom.add_line(p2, p3)
+        l2 = geom.add_line(p3, p4)
+        l3 = geom.add_line(p4, p5)
+        
+        ca1 = geom.add_circle_arc(p5,p0,p1)
+
+        loop = geom.add_curve_loop([l0, l1, l2, l3, ca1])
+        surface = geom.add_plane_surface(loop)
+        geom.add_physical(l0, "bottom")
+        geom.add_physical(l1, "right")
+        geom.add_physical(l2, "top")
+        geom.add_physical(l3, "left")
+        # geom.add_physical(ca1, "hole")
+        
+        mesh = geom.generate_mesh()
+        #mesh.write("test.vtk")
+    cells = mesh.cells_dict['triangle']
+    nodes = mesh.points[:, 0:2]
+    bottom_nodes = mesh.cell_sets_dict['bottom']['line']
+    top_nodes = mesh.cell_sets_dict['top']['line']
+    left_nodes = mesh.cell_sets_dict['left']['line']
+    right_nodes = mesh.cell_sets_dict['right']['line']
+    
+    nodesets = {'bottom': bottom_nodes, 'top': top_nodes, 'left': left_nodes, 'right': right_nodes}
+    basicfem_grid = Grid(nodes, cells, nodesets)
+    return basicfem_grid
