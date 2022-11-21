@@ -6,44 +6,8 @@ import time
 import numpy as np
 import scipy.sparse
 import scipy.sparse.linalg
-import cupy as cp
-import cupyx.scipy.sparse
-import cupyx.scipy.sparse.linalg
 
-def meshgrid_triangles(n, m):
-    """Returns triangles to mesh a np.meshgrid of n x m points."""
-    tri = []
-    for i in range(n-1):
-        for j in range(m-1):
-            a = i + j*(n)
-            b = (i+1) + j*n
-            d = i + (j+1)*n
-            c = (i+1) + (j+1)*n
-            if j % 2 == 1:
-                tri += [[a, b, d], [b, c, d]]
-            else:
-                tri += [[a, b, c], [a, c, d]]
-    return np.array(tri, dtype=np.int32)
-
-def get_rand_grid(grid_sz):
-    """Returns nodes coordinates and cell triangles of a square grid.
-    
-    Args:
-        grid_sz (int): Grid size
-    
-    Returns:
-        Tuple: Nodes and cells as np.ndarray
-    """
-    xs = np.linspace(-grid_sz / 2, grid_sz / 2, grid_sz)
-    nodes = np.vstack([xs, xs]).T
-    cells = meshgrid_triangles(grid_sz, grid_sz)
-    return nodes, cells
-
-def test_run_simulation(device='cpu'):
-    if device == 'gpu':
-        xp = cp
-    else:
-        xp = np
+def test_run_simulation():
     # Define grid and cells
     nodes = np.array([[-1., -1.],
                       [ 1., -1.],
@@ -54,7 +18,7 @@ def test_run_simulation(device='cpu'):
     cells = np.array(cells, dtype=np.int32)
     # TODO(Stefano): Work in progress on automatic random grid generation
     # nodes, cells = get_rand_grid(grid_sz=8)
-    grid = Grid(nodes, cells, device=device)
+    grid = Grid(nodes, cells)
     # TODO(Kim): The following should be stored in grid
     bottom_nodes = [0, 1]
     left_nodes = [0, 3]
@@ -68,45 +32,31 @@ def test_run_simulation(device='cpu'):
     # Init material specifications
     E = 200e3
     nu = 0.3
-    material = Elasticity(E, nu, device=device)
+    material = Elasticity(E, nu)
     # Init weak form equation solver (for single element)
     thickness = 1.0
     weak_form = MomentumBalance(material, thickness)
     # Init and constrain K, f and a components
     I, J = dh.sparsity_pattern(grid)
-    if device == 'gpu':
-        K = cupyx.scipy.sparse.csr_matrix((xp.zeros(len(I)),
-                                          (xp.array(I), xp.array(J))))
-    else:
-        K = scipy.sparse.csr_matrix((np.zeros(len(I)), (I, J)))
-    f = xp.zeros(len(I), dtype=xp.float32)
-    a = xp.zeros(dh.ndofs_total(grid), dtype=xp.float32)
+    K = scipy.sparse.csr_matrix((np.zeros(len(I)), (I, J)))
+    f = np.zeros(len(I), dtype=np.float32)
+    a = np.zeros(dh.ndofs_total(grid), dtype=np.float32)
     a[top_dofs[:, 1]] = -0.1
-    if device == 'gpu':
-        bottom_dofs = cp.asarray(bottom_dofs)
-        left_dofs = cp.asarray(left_dofs)
-        top_dofs = cp.asarray(top_dofs)
-    prescribed_dofs = xp.concatenate((bottom_dofs[:, 1],
+    prescribed_dofs = np.concatenate((bottom_dofs[:, 1],
                                       left_dofs[:,0],
                                       top_dofs[:,1]))
-    free_dofs = xp.setdiff1d(range(dh.ndofs_total(grid)), prescribed_dofs)
+    free_dofs = np.setdiff1d(range(dh.ndofs_total(grid)), prescribed_dofs)
     # Init local variables for element loop (re-use them across iterations)
     ndofs_cell = dh.ndofs_per_cell(grid)
-    dofs = xp.empty(ndofs_cell, dtype=xp.int32)
-    ke = xp.zeros((ndofs_cell, ndofs_cell), dtype=xp.float32)
-    re = xp.zeros(ndofs_cell, dtype=xp.float32)
-    xe = xp.zeros((grid.nnodes_per_cell(), nodes.shape[-1]), dtype=xp.float32)
-    element = CST(device=device)
+    dofs = np.empty(ndofs_cell, dtype=np.int32)
+    ke = np.zeros((ndofs_cell, ndofs_cell), dtype=np.float32)
+    re = np.zeros(ndofs_cell, dtype=np.float32)
+    xe = np.zeros((grid.nnodes_per_cell(), nodes.shape[-1]), dtype=np.float32)
+    element = CST()
     # Initialize profiler
     profiler = cProfile.Profile()
     # Start profiling
     profiler.enable()
-    # Init CuPy profilers
-    start_gpu = cp.cuda.Event()
-    end_gpu = cp.cuda.Event()
-    # Start CuPy profilers
-    start_cpu = time.perf_counter()
-    start_gpu.record()
     # Assemble K and f components
     for cellid in range(len(grid.cells)):
         # NOTE(Stefano): The methods getcoordinates and celldofs now return the
@@ -126,18 +76,7 @@ def test_run_simulation(device='cpu'):
             f[dof_i] += re[i]
     A = K[free_dofs, :][:, free_dofs]
     b = -K[free_dofs, :][:, prescribed_dofs] @ a[prescribed_dofs]
-    if device == 'gpu':
-        a[free_dofs] = cupyx.scipy.sparse.linalg.spsolve(A, b)
-    else:
-        a[free_dofs] = scipy.sparse.linalg.spsolve(A, b)
-    # Stop CuPy profilers
-    end_gpu.record()
-    end_cpu = time.perf_counter()
-    end_gpu.synchronize()
-    t_gpu = cp.cuda.get_elapsed_time(start_gpu, end_gpu)
-    t_cpu = end_cpu - start_cpu
-    print(f'CPU Time: {t_cpu:.3f} ms')
-    print(f'GPU Time: {t_gpu:.3f} ms')
+    a[free_dofs] = scipy.sparse.linalg.spsolve(A, b)
     # Stop profiling
     profiler.disable()
     # Create statistics from the profiler, sorted by cumulative time

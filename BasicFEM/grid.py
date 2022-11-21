@@ -1,9 +1,8 @@
 import numpy as np
-import cupy as cp
 
 class Grid:
     # def __init__(self, nodes, cells, nodesets=None, bottom_nodes=None, left_nodes=None, top_nodes=None):
-    def __init__(self, nodes, cells, device='cpu'):
+    def __init__(self, nodes, cells):
         """Initialized Grid class.
         
         Models a grid structure.... Each node has a set of coordinates (either
@@ -17,12 +16,8 @@ class Grid:
             left_nodes (list): List of indexes of the left nodes
             top_nodes (list): List of indexes of the bottom nodes
         """
-        if device == 'gpu':
-            self.nodes = cp.asarray(nodes)
-            self.cells = cp.asarray(cells)
-        else:
-            self.nodes = nodes
-            self.cells = cells
+        self.nodes = nodes
+        self.cells = cells
         # self.nodesets = nodesets
         # self.bottom_nodes = bottom_nodes
         # self.left_nodes = left_nodes
