@@ -38,10 +38,13 @@ def test_run_simulation():
     weak_form = MomentumBalance(material, thickness)
     # Init and constrain K, f and a components
     I, J = dh.sparsity_pattern(grid)
-    K = scipy.sparse.csr_matrix((np.zeros(len(I)), (I, J)))
-    f = np.zeros(len(I), dtype=np.float32)
-    a = np.zeros(dh.ndofs_total(grid), dtype=np.float32)
+    f_len = len(I)
+    a_len = dh.ndofs_total(grid)
+    f = np.zeros(f_len, dtype=np.float32)
+    a = np.zeros(a_len, dtype=np.float32)
     a[top_dofs[:, 1]] = -0.1
+    # K = scipy.sparse.csr_matrix((np.zeros(len(I)), (I, J)))
+    K = np.zeros((a_len, f_len), dtype=np.float32)
     prescribed_dofs = np.concatenate((bottom_dofs[:, 1],
                                       left_dofs[:,0],
                                       top_dofs[:,1]))
@@ -77,13 +80,20 @@ def test_run_simulation():
 
     prescribed_dofs = np.concatenate((bottom_dofs[:, 1], left_dofs[:,0], top_dofs[:,1]))
     free_dofs = np.setdiff1d(range(dh.ndofs_total(grid)), prescribed_dofs)
-    a[free_dofs] = scipy.sparse.linalg.spsolve(K[free_dofs, :][:, free_dofs], -K[free_dofs, :][:, prescribed_dofs] @ a[prescribed_dofs])
+
+    A = scipy.sparse.csr_matrix(K[free_dofs, :][:, free_dofs], dtype=np.float32, copy=True)
+    Kb = scipy.sparse.csr_matrix(-K[free_dofs, :][:, prescribed_dofs], dtype=np.float32, copy=True)
+    b = Kb @ a[prescribed_dofs]
+    a[free_dofs] = scipy.sparse.linalg.spsolve(A, b)
+    # a[free_dofs] = scipy.sparse.linalg.spsolve(K[free_dofs, :][:, free_dofs], -K[free_dofs, :][:, prescribed_dofs] @ a[prescribed_dofs])
+
     # Stop profiling
     profiler.disable()
     # Create statistics from the profiler, sorted by cumulative time
     stats = pstats.Stats(profiler).sort_stats('cumtime')
     # Print the 10 (inclusive) most expensive functions
-    stats.print_stats(10)
+    stats.print_stats(100)
+    stats.dump_stats('../program.prof')
 
 
 def test_run_simulation_plate_with_hole():
