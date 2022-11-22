@@ -1,4 +1,4 @@
-from BasicFEM import DofHandler, Elasticity, MomentumBalance, Grid, CST
+from BasicFEM import * 
 
 import cProfile
 import pstats

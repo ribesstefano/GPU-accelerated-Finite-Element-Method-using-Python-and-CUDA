@@ -1,4 +1,3 @@
-import pygmsh
 from BasicFEM import *
 
 def test_generate_mesh():

@@ -3,7 +3,7 @@ import pygmsh
 
 class Grid:
     # def __init__(self, nodes, cells, nodesets=None, bottom_nodes=None, left_nodes=None, top_nodes=None):
-    def __init__(self, nodes, cells):
+    def __init__(self, nodes, cells, nodesets=None):
         """Initialized Grid class.
         
         Models a grid structure.... Each node has a set of coordinates (either
@@ -19,7 +19,7 @@ class Grid:
         """
         self.nodes = nodes
         self.cells = cells
-        # self.nodesets = nodesets
+        self.nodesets = nodesets
         # self.bottom_nodes = bottom_nodes
         # self.left_nodes = left_nodes
         # self.top_nodes = top_nodes

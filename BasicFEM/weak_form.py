@@ -71,8 +71,8 @@ class CST:
         return detJ
 
     def shape_values(self, qp):
-        xi1 = iso_coords[qp][0]
-        xi2 = iso_coords[qp][1]
+        xi1 = self.iso_coords[qp][0]
+        xi2 = self.iso_coords[qp][1]
         N = np.array([1.0 - xi1 - xi2, xi1, xi2])
         return N
 
