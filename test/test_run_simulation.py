@@ -83,7 +83,7 @@ def test_run_simulation():
 
     A = scipy.sparse.csr_matrix(K[free_dofs, :][:, free_dofs], dtype=np.float32, copy=True)
     Kb = scipy.sparse.csr_matrix(-K[free_dofs, :][:, prescribed_dofs], dtype=np.float32, copy=True)
-    b = Kb @ a[prescribed_dofs]
+    b = Kb @ f[prescribed_dofs]
     a[free_dofs] = scipy.sparse.linalg.spsolve(A, b)
     # a[free_dofs] = scipy.sparse.linalg.spsolve(K[free_dofs, :][:, free_dofs], -K[free_dofs, :][:, prescribed_dofs] @ a[prescribed_dofs])
 
@@ -117,7 +117,7 @@ def test_run_simulation_plate_with_hole():
     ndofs_cell = dh.ndofs_per_cell(grid)
     ke = np.zeros((ndofs_cell, ndofs_cell))
     re = np.zeros(ndofs_cell)
-    dofs = np.empty(ndofs_cell, np.int)
+    dofs = np.empty(ndofs_cell, np.int32)
     xe = np.zeros((grid.nnodes_per_cell(), 2))
     a = np.zeros(dh.ndofs_total(grid))
 
@@ -143,5 +143,5 @@ def test_run_simulation_plate_with_hole():
     prescribed_dofs = np.concatenate((bottom_dofs[:, 1], left_dofs[:,0], top_dofs[:,1]))
     free_dofs = np.setdiff1d(range(dh.ndofs_total(grid)), prescribed_dofs)
 
-    a[free_dofs] = scipy.sparse.linalg.spsolve(K[free_dofs, :][:, free_dofs], -K[free_dofs, :][:, prescribed_dofs] @ a[prescribed_dofs])
+    a[free_dofs] = scipy.sparse.linalg.spsolve(K[free_dofs, :][:, free_dofs], -K[free_dofs, :][:, prescribed_dofs] @ f[prescribed_dofs])
 
