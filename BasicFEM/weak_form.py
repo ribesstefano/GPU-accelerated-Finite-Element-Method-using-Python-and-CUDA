@@ -48,14 +48,14 @@ class CST:
     def _triangular_quad_points(self, dim, nquadpoints, dtype):
         if dim == 2:
             if nquadpoints == 1:
-                iso_coords = np.array([[1/3, 1/3]], dtype=dtype)
-                weights = np.array([1/2], dtype=dtype)
+                iso_coords = np.array([[1 / 3, 1 / 3]], dtype=dtype)
+                weights = np.array([1 / 2], dtype=dtype)
                 return iso_coords, weights
             elif nquadpoints == 3:
-                iso_coords = np.array([[1/6, 1/6],
-                                       [2/3, 1/6],
-                                       [1/6, 2/3]], dtype=dtype)
-                weights = np.array([1/6, 1/6, 1/6], dtype=dtype)
+                iso_coords = np.array([[1 / 6, 1 / 6],
+                                       [2 / 3, 1 / 6],
+                                       [1 / 6, 2 / 3]], dtype=dtype)
+                weights = np.array([1 / 6, 1 / 6, 1 / 6], dtype=dtype)
                 return iso_coords, weights
         raise ValueError(f'Only dim equal to 2 supported. dim={dim} supplied')
 
@@ -80,7 +80,7 @@ class CST:
         # TODO(Kim): Not generally constant, could depend on iso_coord (xi)
         Jinv_t = np.linalg.inv(self.jacobian(xe)).T
         # TODO(Kim): Not generally constant, could depend on iso_coord (xi)
-        dNdxi = np.array([[-1.0, -1.0], [1.0, 0.0], [0.0, 1.0]])
+        dNdxi = np.array([[-1.0, -1.0], [1.0, 0.0], [0.0, 1.0]], dtype=np.float32)
         dNdx = np.empty_like(dNdxi)
         for i in range(dNdx.shape[0]):
             dNdx[i] = Jinv_t @ dNdxi[i]
@@ -90,7 +90,7 @@ class CST:
         dNdx = self.shape_gradients(xe)
         # TODO(Kim): Not ideal to hard-code dimensions, but will never change
         # for 2D elements...
-        B = np.zeros((3, 2 * dNdx.shape[0]))
+        B = np.zeros((3, 2 * dNdx.shape[0]), dtype=np.float32)
         for i in range(dNdx.shape[0]):
             dNidx = dNdx[i][0]
             dNidy = dNdx[i][1]

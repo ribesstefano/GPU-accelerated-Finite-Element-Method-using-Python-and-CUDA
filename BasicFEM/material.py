@@ -5,7 +5,7 @@ class Elasticity:
         self.E = E
         self.nu = nu
         if dim == 2 and plane_state == 'plane strain':
-            tmp = np.array([[1 - nu, nu, 0.0], [nu, 1 - nu, 0.0], [0.0, 0.0, (1 - 2 * nu) / 2]])
+            tmp = np.array([[1 - nu, nu, 0.0], [nu, 1 - nu, 0.0], [0.0, 0.0, (1 - 2 * nu) / 2]], dtype=np.float32)
             stiffness_matrix = E / ((1 + nu) * (1 - 2 * nu)) * tmp
         else:
             raise ValueError(f'Only dim equal to 2 supported. dim={dim} supplied')
