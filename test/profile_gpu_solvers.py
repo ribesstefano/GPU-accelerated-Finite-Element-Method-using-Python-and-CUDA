@@ -69,15 +69,14 @@ def profile_gpu_solvers():
     with open('solvers_profiling_gpu.csv', 'w') as fp:
         fp.write(f'solver_name,lcar,n_nodes,n_cells,n_runs,cpu/gpu,t[s]\n')
         for lcar in lcars:
+            a, K, f, free_dofs, prescribed_dofs, grid = k_assembly(lcar)
+            n_nodes = len(grid.nodes)
+            n_cells = len(grid.cells)
+            A = cupyx.scipy.sparse.csr_matrix(K[free_dofs, :][:, free_dofs])
+            b = -K[free_dofs, :][:, prescribed_dofs] @ a[prescribed_dofs]
+            b = cp.asarray(b)
             for solver_name, solver in solvers:
-                a, K, f, free_dofs, prescribed_dofs, grid = k_assembly(lcar)
-                A = cupyx.scipy.sparse.csr_matrix(K[free_dofs, :][:, free_dofs])
-                b = -K[free_dofs, :][:, prescribed_dofs] @ a[prescribed_dofs]
-                b = cp.asarray(b)
-                print(f'running solver: {solver_name}')
                 t = timeit.timeit(stmt=lambda: solver(A, b), number=n_runs)
-                n_nodes = len(grid.nodes)
-                n_cells = len(grid.cells)
                 print(f'[Mesh size: {lcar}] {solver_name}: {t / n_runs:.4f} s')
                 fp.write(f'{solver_name},{lcar},{n_nodes},{n_cells},{n_runs},gpu,{t / n_runs:.4f}\n')
 

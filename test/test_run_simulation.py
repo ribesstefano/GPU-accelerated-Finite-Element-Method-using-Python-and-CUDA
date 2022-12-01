@@ -211,13 +211,13 @@ def profile_solvers():
     with open('solvers_profiling.csv', 'w') as fp:
         fp.write(f'solver_name,lcar,n_nodes,n_cells,n_runs,cpu/gpu,t[s]\n')
         for lcar in lcars:
+            a, K, f, free_dofs, prescribed_dofs, grid = k_assembly(lcar)
+            A = K[free_dofs, :][:, free_dofs]
+            b = -K[free_dofs, :][:, prescribed_dofs] @ a[prescribed_dofs]
+            n_nodes = len(grid.nodes)
+            n_cells = len(grid.cells)
             for solver_name, solver in solvers:
-                a, K, f, free_dofs, prescribed_dofs, grid = k_assembly(lcar)
-                A = K[free_dofs, :][:, free_dofs]
-                b = -K[free_dofs, :][:, prescribed_dofs] @ a[prescribed_dofs]
                 t = timeit.timeit(stmt=lambda: solver(A, b), number=n_runs)
-                n_nodes = len(grid.nodes)
-                n_cells = len(grid.cells)
                 print(f'[Mesh size: {lcar}] {solver_name}: {t / n_runs:.4f} s')
                 fp.write(f'{solver_name},{lcar},{n_nodes},{n_cells},{n_runs},cpu,{t / n_runs:.4f}\n')
 
