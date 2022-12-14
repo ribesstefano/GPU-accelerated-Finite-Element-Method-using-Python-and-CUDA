@@ -58,7 +58,7 @@ def k_assembly_ref(K, f, grid, dh, a, weak_form):
         # updated values. Makes the code more readable and Pythonic. Also, it
         # doesn't affect performance (it's just passing around references, i.e.
         # pointers, not the actual values).
-        xe = grid.getcoordinates(xe, cellid)
+        xe = grid.getcoordinates(cellid, xe)
         dofs = dh.celldofs(dofs, grid, cellid)
         # print(f'Cell n.{cellid:3d}, DoF: {dofs}')
         ke.fill(0.0)
@@ -195,7 +195,7 @@ def k_assembly_batched(K, f, grid, dh, a, weak_form, batch_size=32):
         # print(f'Working on cell n.{cellid} (batch size: {actual_batch_sz}, n_cells: {n_cells})')
         # Assemble batched xe and ue
         for b in range(actual_batch_sz):
-            xe[b] = grid.getcoordinates(xe[b], cellid + b)
+            xe[b] = grid.getcoordinates(cellid + b, xe[b])
             dofs[b] = dh.celldofs(dofs[b], grid, cellid + b)
             ue[b] = a[dofs[b]]
         element_routine(weak_form.material.stiffness, weak_form.thickness, ke, re, element.weights, xe, ue, detJ, J, B, dNdxi, dNdx)

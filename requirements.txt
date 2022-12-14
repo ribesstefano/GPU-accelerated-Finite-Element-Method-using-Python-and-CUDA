@@ -3,3 +3,4 @@ scipy==1.9.3
 meshio==5.3.4
 pygmsh==7.1.17
 numba==0.56.4
+pymetis==1.16.0

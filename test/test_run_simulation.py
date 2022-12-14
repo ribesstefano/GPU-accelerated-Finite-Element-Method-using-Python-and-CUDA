@@ -8,6 +8,38 @@ import scipy.sparse.linalg
 import time
 import timeit
 
+import pymetis
+
+
+def create_adjacency_matrix(connections):
+    matrix = defaultdict(dict)
+    for a, b in connections:
+        matrix[a][b] = 1
+        matrix[b][a] = 1
+    return matrix
+
+
+def is_connected_to_all(vertex, group, matrix):
+    for v in group:
+        if vertex != v and vertex not in matrix[v]:
+            return False
+    return True
+
+
+def group_vertexes(vertixes):
+    matrix = create_adjacency_matrix(vertixes)
+    groups = []
+    current_group = set()
+    for vertex in matrix.keys():
+        if is_connected_to_all(vertex, current_group, matrix):
+            current_group.add(vertex)
+        else:
+            groups.append(current_group)
+            current_group = {vertex}
+    groups.append(current_group)
+    return groups
+
+
 def test_run_simulation():
     # Define grid and cells
     nodes = np.array([[-1., -1.],
@@ -47,8 +79,8 @@ def test_run_simulation():
     # K = scipy.sparse.csr_matrix((np.zeros(len(I)), (I, J)))
     K = np.zeros((a_len, f_len), dtype=np.float32)
     prescribed_dofs = np.concatenate((bottom_dofs[:, 1],
-                                      left_dofs[:,0],
-                                      top_dofs[:,1]))
+                                      left_dofs[:, 0],
+                                      top_dofs[:, 1]))
     free_dofs = np.setdiff1d(range(dh.ndofs_total(grid)), prescribed_dofs)
     # Init local variables for element loop (re-use them across iterations)
     ndofs_cell = dh.ndofs_per_cell(grid)
@@ -67,7 +99,7 @@ def test_run_simulation():
         # updated values. Makes the code more readable and Pythonic. Also, it
         # doesn't affect performance (it's just passing around references, i.e.
         # pointers, not the actual values).
-        xe = grid.getcoordinates(xe, cellid)
+        xe = grid.getcoordinates(cellid, xe)
         dofs = dh.celldofs(dofs, grid, cellid)
         ke.fill(0.0)
         re.fill(0.0)
@@ -79,7 +111,7 @@ def test_run_simulation():
                 K[dof_i, dof_j] += ke[i, j]
             f[dof_i] += re[i]
 
-    prescribed_dofs = np.concatenate((bottom_dofs[:, 1], left_dofs[:,0], top_dofs[:,1]))
+    prescribed_dofs = np.concatenate((bottom_dofs[:, 1], left_dofs[:, 0], top_dofs[:, 1]))
     free_dofs = np.setdiff1d(range(dh.ndofs_total(grid)), prescribed_dofs)
 
     A = scipy.sparse.csr_matrix(K[free_dofs, :][:, free_dofs], dtype=np.float32, copy=True)
@@ -97,100 +129,145 @@ def test_run_simulation():
     stats.dump_stats('program.prof')
 
 
+import matplotlib.pyplot as plt
+
 def test_run_simulation_plate_with_hole():
-    grid = generate_grid(0.1)
+    # ==========================================================================
+    # Define mesh
+    # ==========================================================================
+    # grid = generate_grid(0.1) # Original
+    grid = generate_grid(lcar=.1)
+    dh = DofHandler(n_dofs_per_node=2, grid=grid)
+    # ==========================================================================
+    # Define a and prescribe DoFs
+    # ==========================================================================
+    a = np.zeros(dh.get_ndofs_total())
+    bottom_dofs = dh.get_nodes_dofs(grid.nodesets['bottom'])
+    left_dofs = dh.get_nodes_dofs(grid.nodesets['left'])
+    top_dofs = dh.get_nodes_dofs(grid.nodesets['top'])
+    prescribed_dofs = (bottom_dofs[:, 1], left_dofs[:, 0], top_dofs[:, 1])
+    prescribed_dofs = np.concatenate(prescribed_dofs)
+    free_dofs = np.setdiff1d(range(dh.get_ndofs_total()), prescribed_dofs)
+    a[top_dofs[:, 1]] = -0.1
+    # ==========================================================================
+    # Naive global K assembly
+    # ==========================================================================
+    # Init global K matrix and f
+    I, J = dh.get_sparsity_pattern()
+    # K = scipy.sparse.coo_matrix((np.ones(len(I)), (I, J)))
+    # print(f'I:\n{I}')
+    # print(f'J:\n{J}')
+    # print(f'K:\n{K}')
+    # print(f'K:\n{K.todense()}')
+    # # plt.spy(K)
+    # # plt.show()
+    
+    # # subgraphs = group_vertexes([(a, b) for a, b in zip(I, J)])
+    # # for i, graph in enumerate(subgraphs):
+    # #     print(f'graph n.{i}: {graph}')
 
-    dh = DofHandler(2)
+    # n_parts = 8
+    # n_cuts, membership = pymetis.part_graph(n_parts, adjacency=grid.cells)
+    # # n_cuts = 3
+    # # membership = [1, 1, 1, 0, 1, 0, 0]
 
-    E = 200e3
-    nu = 0.3
-    material = Elasticity(E, nu)
+    # print(f'n_cells: {grid.get_num_cells()} (n_parts: {n_parts}) {(grid.get_num_cells() / n_parts) / grid.get_num_cells() * 100}')
 
-    thickness = 1.0
-    weak_form = MomentumBalance(material, thickness)
+    # for part in range(n_parts):
+    #     cells_part = np.argwhere(np.array(membership) == part).ravel()
+    #     print(f'len part n.{part}: {len(cells_part)}')
 
-    element = CST()
+    #     # print(f'len: {len(cells_part)}) cells_part_{part}: {cells_part} = [', end='')
+    #     # for cellid in cells_part:
+    #     #     print(f'{grid.get_nodes_in_cell(cellid)}, ', end='')
+    #     # print(']')
 
-    I, J = dh.sparsity_pattern(grid)
+    # # nodes_part_0 = np.argwhere(np.array(membership) == 0).ravel() # [3, 5, 6]
+    # # nodes_part_1 = np.argwhere(np.array(membership) == 1).ravel() # [0, 1, 2, 4]
+
+    # # print(f'nodes_part_0: {nodes_part_0}')
+    # # print(f'nodes_part_1: {nodes_part_1}')
+
+
     K = scipy.sparse.csr_matrix((np.zeros(len(I)), (I, J)))
     f = np.zeros(len(I))
-
-    ndofs_cell = dh.ndofs_per_cell(grid)
+    # Init element matrices
+    ndofs_cell = dh.get_ndofs_per_cell()
     ke = np.zeros((ndofs_cell, ndofs_cell))
     re = np.zeros(ndofs_cell)
-    dofs = np.empty(ndofs_cell, np.int32)
-    xe = np.zeros((grid.nnodes_per_cell(), 2))
-    a = np.zeros(dh.ndofs_total(grid))
-
-    bottom_dofs = dh.getdofs(grid.nodesets['bottom'])
-    left_dofs = dh.getdofs(grid.nodesets['left'])
-    top_dofs = dh.getdofs(grid.nodesets['top'])
-
-    a[top_dofs[:,1]] = -0.1
-
-    for cellid in range(len(grid.cells)):
-        grid.getcoordinates(xe, cellid)
-        dh.celldofs(dofs, grid, cellid)
+    xe = np.zeros((grid.get_num_nodes_per_cell(), 2))
+    # Init weak form handler
+    weak_form = MomentumBalance(material=Elasticity(E=200e3, nu=0.3),
+                                thickness=1.0,
+                                element=CST())
+    # Run K-assembly over the cells/elements
+    for cellid in range(grid.get_num_cells()):
         ke.fill(0.0)
         re.fill(0.0)
-        ue = a[dofs] # not relevant as input for linear elasticity
-        weak_form.element_routine(ke, re, element, xe, ue)
-        # probably there is a better way for this
-        for (i, dof_i) in enumerate(dofs):
-            for (j, dof_j) in enumerate(dofs):
-                K[dof_i, dof_j] += ke[i,j]
+        xe = grid.get_coordinates(cellid)
+        dofs = dh.get_cell_dofs(cellid)
+        # print(f'{cellid:4d}) dofs (output coords.): {dofs} | nodeid (input coords.): {grid.get_nodes_in_cell(cellid)}')
+        ue = a[dofs] # NOTE: Not relevant as input for linear elasticity
+        weak_form.run_element_routine(ke, re, xe, ue)
+        for i, dof_i in enumerate(dofs):
             f[dof_i] += re[i]
-
-    prescribed_dofs = np.concatenate((bottom_dofs[:, 1], left_dofs[:,0], top_dofs[:,1]))
-    free_dofs = np.setdiff1d(range(dh.ndofs_total(grid)), prescribed_dofs)
-
-    a[free_dofs] = scipy.sparse.linalg.spsolve(K[free_dofs, :][:, free_dofs], -K[free_dofs, :][:, prescribed_dofs] @ a[prescribed_dofs])
+            for j, dof_j in enumerate(dofs):
+                K[dof_i, dof_j] += ke[i, j]
+    # ==========================================================================
+    # Solve system
+    # ==========================================================================
+    K_glob = K[free_dofs, :][:, free_dofs]
+    f_glob = -K[free_dofs, :][:, prescribed_dofs] @ a[prescribed_dofs]
+    a[free_dofs] = scipy.sparse.linalg.spsolve(K_glob, f_glob)
 
 
 def profile_solvers():
-    dh = DofHandler(2)
-    E = 200e3
-    nu = 0.3
-    material = Elasticity(E, nu)
-    thickness = 1.0
-    weak_form = MomentumBalance(material, thickness)
-    element = CST()
 
     def k_assembly(lcar=0.1):
+        # ======================================================================
+        # Define mesh
+        # ======================================================================
         grid = generate_grid(lcar)
-        I, J = dh.sparsity_pattern(grid)
+        dh = DofHandler(n_dofs_per_node=2, grid=grid)
+        # ======================================================================
+        # Define a and prescribe DoFs
+        # ======================================================================
+        a = np.zeros(dh.get_ndofs_total())
+        bottom_dofs = dh.get_nodes_dofs(grid.nodesets['bottom'])
+        left_dofs = dh.get_nodes_dofs(grid.nodesets['left'])
+        top_dofs = dh.get_nodes_dofs(grid.nodesets['top'])
+        prescribed_dofs = (bottom_dofs[:, 1], left_dofs[:, 0], top_dofs[:, 1])
+        prescribed_dofs = np.concatenate(prescribed_dofs)
+        free_dofs = np.setdiff1d(range(dh.get_ndofs_total()), prescribed_dofs)
+        a[top_dofs[:, 1]] = -0.1
+        # ======================================================================
+        # Naive global K assembly
+        # ======================================================================
+        # Init global K matrix and f
+        I, J = dh.get_sparsity_pattern()
         K = scipy.sparse.csr_matrix((np.zeros(len(I)), (I, J)))
         f = np.zeros(len(I))
-
-        ndofs_cell = dh.ndofs_per_cell(grid)
+        # Init element matrices
+        ndofs_cell = dh.get_ndofs_per_cell()
         ke = np.zeros((ndofs_cell, ndofs_cell))
         re = np.zeros(ndofs_cell)
-        dofs = np.empty(ndofs_cell, np.int32)
-        xe = np.zeros((grid.nnodes_per_cell(), 2))
-        a = np.zeros(dh.ndofs_total(grid))
-
-        bottom_dofs = dh.getdofs(grid.nodesets['bottom'])
-        left_dofs = dh.getdofs(grid.nodesets['left'])
-        top_dofs = dh.getdofs(grid.nodesets['top'])
-
-        a[top_dofs[:,1]] = -0.1
-
-        for cellid in range(len(grid.cells)):
-            grid.getcoordinates(xe, cellid)
-            dh.celldofs(dofs, grid, cellid)
+        xe = np.zeros((grid.get_num_nodes_per_cell(), 2))
+        # Init weak form handler
+        weak_form = MomentumBalance(material=Elasticity(E=200e3, nu=0.3),
+                                    thickness=1.0,
+                                    element=CST())
+        # Run K-assembly over the cells/elements
+        for cellid in range(grid.get_num_cells()):
             ke.fill(0.0)
             re.fill(0.0)
-            ue = a[dofs] # not relevant as input for linear elasticity
-            weak_form.element_routine(ke, re, element, xe, ue)
-            # probably there is a better way for this
+            xe = grid.get_coordinates(cellid)
+            dofs = dh.get_cell_dofs(cellid)
+            ue = a[dofs] # NOTE: Not relevant as input for linear elasticity
+            weak_form.run_element_routine(ke, re, xe, ue)
             for (i, dof_i) in enumerate(dofs):
                 for (j, dof_j) in enumerate(dofs):
-                    K[dof_i, dof_j] += ke[i,j]
+                    K[dof_i, dof_j] += ke[i, j]
                 f[dof_i] += re[i]
-
-        prescribed_dofs = (bottom_dofs[:, 1], left_dofs[:,0], top_dofs[:,1])
-        prescribed_dofs = np.concatenate(prescribed_dofs)
-        free_dofs = np.setdiff1d(range(dh.ndofs_total(grid)), prescribed_dofs)
         return a, K, f, free_dofs, prescribed_dofs, grid
 
     n_runs = 20
@@ -221,5 +298,19 @@ def profile_solvers():
                 print(f'[Mesh size: {lcar}] {solver_name}: {t / n_runs:.4f} s')
                 fp.write(f'{solver_name},{lcar},{n_nodes},{n_cells},{n_runs},cpu,{t / n_runs:.4f}\n')
 
+
+import vedo
+
+def plot_mesh():
+    ug = vedo.UGrid('test.vtk')
+    # print(ug.getArrayNames())
+    # ug.selectCellArray('chem_0')
+    vedo.show(ug, axes=True)
+
+from collections import defaultdict
+
+
 if __name__ == '__main__':
-    profile_solvers()
+    # plot_mesh()
+    # profile_solvers()
+    test_run_simulation_plate_with_hole()
