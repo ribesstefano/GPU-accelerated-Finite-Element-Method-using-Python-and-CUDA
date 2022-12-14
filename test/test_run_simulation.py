@@ -136,7 +136,7 @@ def test_run_simulation_plate_with_hole():
     # Define mesh
     # ==========================================================================
     # grid = generate_grid(0.1) # Original
-    grid = generate_grid(lcar=.1)
+    grid = generate_grid(lcar=0.9)
     dh = DofHandler(n_dofs_per_node=2, grid=grid)
     # ==========================================================================
     # Define a and prescribe DoFs
@@ -190,6 +190,11 @@ def test_run_simulation_plate_with_hole():
 
 
     K = scipy.sparse.csr_matrix((np.zeros(len(I)), (I, J)))
+    print(np.all(K.diagonal()) != 0)
+    print(K.diagonal())
+    # plt.spy(K)
+    # plt.savefig('sparse.png')
+    # plt.show()
     f = np.zeros(len(I))
     # Init element matrices
     ndofs_cell = dh.get_ndofs_per_cell()
@@ -217,8 +222,13 @@ def test_run_simulation_plate_with_hole():
     # Solve system
     # ==========================================================================
     K_glob = K[free_dofs, :][:, free_dofs]
+    # plt.spy(K_glob)
+    # plt.savefig('sparse.png')
+    # plt.show()
     f_glob = -K[free_dofs, :][:, prescribed_dofs] @ a[prescribed_dofs]
     a[free_dofs] = scipy.sparse.linalg.spsolve(K_glob, f_glob)
+    print(np.all(K_glob.diagonal()) != 0)
+    print(K_glob.diagonal())
 
 
 def profile_solvers():

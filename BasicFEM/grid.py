@@ -140,7 +140,7 @@ class DofHandler:
     def get_sparsity_pattern(self):
         ndofs_cell = self.get_ndofs_per_cell()
         I, J = [], []
-        for cellid in range(len(self.grid.cells)):
+        for cellid in range(self.grid.get_num_cells()):
             dofs = self.get_cell_dofs(cellid)
             for dof in dofs:
                 I.extend(dofs)
@@ -150,11 +150,34 @@ class DofHandler:
 
 def generate_grid(lcar=0.1):
     with pygmsh.geo.Geometry() as geom:
+        # origin = geom.add_point([0.0, 0.0], lcar)
+        # p0 = geom.add_point([1.0, 0.0], lcar)
+        # p1 = geom.add_point([2.0, 0.0], lcar)
+        # p2 = geom.add_point([2.0, 5.0], lcar)
+        # p3 = geom.add_point([0.0, 5.0], lcar)
+        # p4 = geom.add_point([0.0, 1.0], lcar)
+
+        # a0 = geom.add_circle_arc(p0, origin, p4)
+        # l0 = geom.add_line(p0, p1) 
+        # l1 = geom.add_line(p1, p2)
+        # l2 = geom.add_line(p2, p3)
+        # l3 = geom.add_line(p3, p4)
+
+        # loop = geom.add_curve_loop([l0, l1, l2, l3, a0])
+        # surface = geom.add_plane_surface(loop)
+        # geom.add_physical(a0, 'hole')
+        # geom.add_physical(l0, 'bottom')
+        # geom.add_physical(l1, 'right')
+        # geom.add_physical(l2, 'top')
+        # geom.add_physical(l3, 'left')
+        # mesh = geom.generate_mesh()
+
+
         p0 = geom.add_point([0.0, 0.0], lcar)
         p1 = geom.add_point([1.0, 0.0], lcar)
         p2 = geom.add_point([2.0, 0.0], lcar)
-        p3 = geom.add_point([2.0, 2.0], lcar)
-        p4 = geom.add_point([0.0, 2.0], lcar)
+        p3 = geom.add_point([2.0, 5.0], lcar)
+        p4 = geom.add_point([0.0, 5.0], lcar)
         p5 = geom.add_point([0.0, 1.0], lcar)
         
         l0 = geom.add_line(p1, p2) 
@@ -167,19 +190,27 @@ def generate_grid(lcar=0.1):
         loop = geom.add_curve_loop([l0, l1, l2, l3, ca1])
         surface = geom.add_plane_surface(loop)
         geom.add_physical(l0, 'bottom')
-        geom.add_physical(l1, 'right')
         geom.add_physical(l2, 'top')
         geom.add_physical(l3, 'left')
-        # geom.add_physical(ca1, 'hole')
-        
-        mesh = geom.generate_mesh()
+        geom.add_physical(l1, 'right')
+        geom.add_physical(ca1, 'hole')
+
+        mesh = geom.generate_mesh(dim=2)
 
     cells = mesh.cells_dict['triangle']
-    nodes = mesh.points[:, 0:2]
+    # NOTE: The mesh is generated in 3D. Get only the first two coordinates
+    nodes = mesh.points[:, :2]
+    for node in mesh.points:
+        print(node)
     bottom_nodes = mesh.cell_sets_dict['bottom']['line']
     top_nodes = mesh.cell_sets_dict['top']['line']
     left_nodes = mesh.cell_sets_dict['left']['line']
     right_nodes = mesh.cell_sets_dict['right']['line']
+    nodesets = {'bottom': bottom_nodes,
+                'top': top_nodes,
+                'left': left_nodes,
+                'right': right_nodes
+                }
     
     # with pygmsh.geo.Geometry() as geom:
     #     poly = geom.add_polygon(
@@ -207,16 +238,7 @@ def generate_grid(lcar=0.1):
     #     print(geom)
     #     print('-' * 80)
     #     mesh = geom.generate_mesh()
-    # mesh.write('test.vtk')
-
-
-
-    
-    nodesets = {'bottom': bottom_nodes,
-                'top': top_nodes,
-                'left': left_nodes,
-                'right': right_nodes
-                }
+    mesh.write('test.vtk')
     basicfem_grid = Grid(nodes, cells, nodesets)
     return basicfem_grid
 
