@@ -130,13 +130,14 @@ def test_run_simulation():
 
 
 import matplotlib.pyplot as plt
+import matplotlib.tri as tri
 
 def test_run_simulation_plate_with_hole():
     # ==========================================================================
     # Define mesh
     # ==========================================================================
     # grid = generate_grid(0.1) # Original
-    grid = generate_grid(lcar=0.9)
+    grid = generate_grid(lcar=0.8)
     dh = DofHandler(n_dofs_per_node=2, grid=grid)
     # ==========================================================================
     # Define a and prescribe DoFs
@@ -149,6 +150,10 @@ def test_run_simulation_plate_with_hole():
     prescribed_dofs = np.concatenate(prescribed_dofs)
     free_dofs = np.setdiff1d(range(dh.get_ndofs_total()), prescribed_dofs)
     a[top_dofs[:, 1]] = -0.1
+    # ==========================================================================
+    # Plot mesh
+    # ==========================================================================
+    # grid.plot()
     # ==========================================================================
     # Naive global K assembly
     # ==========================================================================
@@ -198,9 +203,8 @@ def test_run_simulation_plate_with_hole():
     f = np.zeros(len(I))
     # Init element matrices
     ndofs_cell = dh.get_ndofs_per_cell()
-    ke = np.zeros((ndofs_cell, ndofs_cell))
-    re = np.zeros(ndofs_cell)
-    xe = np.zeros((grid.get_num_nodes_per_cell(), 2))
+    ke = np.zeros((ndofs_cell, ndofs_cell), dtype=np.float32)
+    re = np.zeros(ndofs_cell, dtype=np.float32)
     # Init weak form handler
     weak_form = MomentumBalance(material=Elasticity(E=200e3, nu=0.3),
                                 thickness=1.0,
@@ -229,6 +233,10 @@ def test_run_simulation_plate_with_hole():
     a[free_dofs] = scipy.sparse.linalg.spsolve(K_glob, f_glob)
     print(np.all(K_glob.diagonal()) != 0)
     print(K_glob.diagonal())
+    print(K.shape)
+    for i, x in enumerate(K_glob.diagonal()):
+        if x == 0:
+            print(f'Zero value at element {i}x{i}')
 
 
 def profile_solvers():

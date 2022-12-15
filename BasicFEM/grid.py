@@ -1,5 +1,7 @@
 import numpy as np
 import pygmsh
+import matplotlib.pyplot as plt
+import matplotlib.tri as tri
 
 class Grid:
     # def __init__(self, nodes, cells, nodesets=None, bottom_nodes=None, left_nodes=None, top_nodes=None):
@@ -17,8 +19,8 @@ class Grid:
             left_nodes (list): List of indexes of the left nodes
             top_nodes (list): List of indexes of the bottom nodes
         """
-        self.nodes = nodes
-        self.cells = cells
+        self.nodes = np.array(nodes, dtype=np.float32)
+        self.cells = np.array([np.int32(c) for c in cells], dtype=np.int32)
         self.nodesets = nodesets
         # self.bottom_nodes = bottom_nodes
         # self.left_nodes = left_nodes
@@ -57,6 +59,40 @@ class Grid:
     def get_num_cells(self):
         return len(self.cells)
 
+    def plot(self, nodal_values=None, filename=None, show=True):
+        """
+        Plots mesh and eventually nodal values. From:
+        https://stackoverflow.com/questions/52202014/how-can-i-plot-2d-fem-results-using-matplotlib
+        
+        :param      nodal_values:  The nodal values
+        :type       nodal_values:  np.array or list (must have same length as
+                                   grid nodes)
+        
+        :returns:   None
+        :rtype:     None
+        """
+        if len(self.nodes.shape) > 2:
+            print(f'WARNING. Plotting for 3D nodes is not supported yet. Skipping plot generation.')
+            return
+        nodes_x = self.nodes[:, 0]
+        nodes_y = self.nodes[:, 1]
+        if nodal_values is not None:
+            # Create an unstructured triangular grid instance
+            triangulation = tri.Triangulation(nodes_x, nodes_y, self.cells)
+            # Plot the contours
+            plt.tricontourf(triangulation, nodal_values)
+            plt.colorbar()
+        # Plot the finite element mesh
+        for element in self.cells:
+            x = [nodes_x[element[i]] for i in range(len(element))]
+            y = [nodes_y[element[i]] for i in range(len(element))]
+            plt.fill(x, y, edgecolor='black', fill=False)
+        plt.axis('equal')
+        if filename is not None:
+            plt.savefig(filename)
+        if show:
+            plt.show()
+
 
 class DofHandler:
     """Associated to each node: one node can have multiple DoF.
@@ -76,8 +112,8 @@ class DofHandler:
         self.grid = grid
 
     def ndofs_total(self, grid):
-        nnodes = grid.nodes.shape[0]
-        return nnodes * self.n_dofs_per_node
+        n_nodes = grid.nodes.shape[0]
+        return n_nodes * self.n_dofs_per_node
     
     def ndofs_per_cell(self, grid):
         return grid.nnodes_per_cell() * self.n_dofs_per_node
@@ -90,6 +126,7 @@ class DofHandler:
         return dofs
     
     def sparsity_pattern(self, grid):
+        # TODO: Deprecated.
         ndofs_cell = self.ndofs_per_cell(grid)
         # dofs = [0 for i in range(ndofs_cell)]
         dofs = np.zeros(ndofs_cell, int)
@@ -115,18 +152,19 @@ class DofHandler:
         return dofs
 
     def get_ndofs_total(self):
-        nnodes = self.grid.nodes.shape[0]
-        return nnodes * self.n_dofs_per_node
+        n_nodes = self.grid.nodes.shape[0]
+        return n_nodes * self.n_dofs_per_node
 
     def get_ndofs_per_cell(self):
         return self.grid.nnodes_per_cell() * self.n_dofs_per_node
 
     def get_cell_dofs(self, cellid):
         dofs = np.empty(self.get_ndofs_per_cell(), dtype=np.int32)
-        n = self.n_dofs_per_node
+        n_dofs = self.n_dofs_per_node
         for (i, nodeid) in enumerate(self.grid.cells[cellid]):
-            for d in range(n):
-                dofs[i * n + d] = nodeid * n + d
+            for d in range(n_dofs):
+                dofs[i * n_dofs + d] = nodeid * n_dofs + d
+            # print(f'dofs[{i * n_dofs}:{i * n_dofs + n_dofs-1}] = {dofs[i * n_dofs:i * n_dofs + n_dofs]}')
         return dofs
 
     def get_nodes_dofs(self, node_ids):
@@ -138,14 +176,20 @@ class DofHandler:
         return dofs
 
     def get_sparsity_pattern(self):
-        ndofs_cell = self.get_ndofs_per_cell()
-        I, J = [], []
+        n_dofs_cell = self.get_ndofs_per_cell()
+        row_idx, col_idx = [], []
         for cellid in range(self.grid.get_num_cells()):
             dofs = self.get_cell_dofs(cellid)
             for dof in dofs:
-                I.extend(dofs)
-                J.extend([dof] * ndofs_cell)
-        return I, J
+                row_idx.extend(dofs)
+                col_idx.extend([dof] * n_dofs_cell)
+                if cellid == 28:
+                    print(f'row: {dofs}')
+                    print(f'col: {[dof] * n_dofs_cell}')
+                    # print(f'row: {row_idx}')
+                    # print(f'col: {col_idx}')
+                    print('-' * 80)
+        return row_idx, col_idx
 
 
 def generate_grid(lcar=0.1):
