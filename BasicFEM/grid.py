@@ -22,6 +22,7 @@ class Grid:
         self.nodes = np.array(nodes, dtype=np.float32)
         self.cells = np.array([np.int32(c) for c in cells], dtype=np.int32)
         self.nodesets = nodesets
+        self.n_dim = self.nodes.shape[-1]
         # self.bottom_nodes = bottom_nodes
         # self.left_nodes = left_nodes
         # self.top_nodes = top_nodes
@@ -44,7 +45,7 @@ class Grid:
             Tuple: List of elements coordinates of the specified cell
         """
         if xe is None:
-            xe = np.zeros((self.nnodes_per_cell(), 2))
+            xe = np.zeros((self.nnodes_per_cell(), self.n_dim))
         nodes = self.cells[cellid]
         for (i, nodeid) in enumerate(nodes):
             xe[i] = self.nodes[nodeid]
@@ -110,6 +111,7 @@ class DofHandler:
         """
         self.n_dofs_per_node = n_dofs_per_node
         self.grid = grid
+        self.all_dofs = {}
 
     def ndofs_total(self, grid):
         n_nodes = grid.nodes.shape[0]
@@ -130,14 +132,14 @@ class DofHandler:
         ndofs_cell = self.ndofs_per_cell(grid)
         # dofs = [0 for i in range(ndofs_cell)]
         dofs = np.zeros(ndofs_cell, int)
-        I = []
-        J = []
+        row_idx = []
+        col_idx = []
         for cellid in range(len(grid.cells)):
             self.celldofs(dofs, grid, cellid)
             for dof in dofs:
-                I.extend(dofs)
-                J.extend([dof] * ndofs_cell)
-        return I, J
+                row_idx.extend(dofs)
+                col_idx.extend([dof] * ndofs_cell)
+        return row_idx, col_idx
 
     def getdofs(self, node_ids):
         # TODO: Deprecated.
@@ -146,7 +148,7 @@ class DofHandler:
     def get_dofs(self, node_ids):
         n = self.n_dofs_per_node
         dofs = np.empty((len(node_ids), n), dtype=np.int32)
-        for (i, nodeid) in enumerate(node_ids):
+        for i, nodeid in enumerate(node_ids):
             for d in range(n):
                 dofs[i, d] = nodeid * n + d
         return dofs
@@ -161,10 +163,10 @@ class DofHandler:
     def get_cell_dofs(self, cellid):
         dofs = np.empty(self.get_ndofs_per_cell(), dtype=np.int32)
         n_dofs = self.n_dofs_per_node
-        for (i, nodeid) in enumerate(self.grid.cells[cellid]):
+        for i, nodeid in enumerate(self.grid.cells[cellid]):
             for d in range(n_dofs):
                 dofs[i * n_dofs + d] = nodeid * n_dofs + d
-            # print(f'dofs[{i * n_dofs}:{i * n_dofs + n_dofs-1}] = {dofs[i * n_dofs:i * n_dofs + n_dofs]}')
+                self.all_dofs[nodeid * n_dofs + d] = None
         return dofs
 
     def get_nodes_dofs(self, node_ids):
@@ -183,40 +185,21 @@ class DofHandler:
             for dof in dofs:
                 row_idx.extend(dofs)
                 col_idx.extend([dof] * n_dofs_cell)
-                if cellid == 28:
-                    print(f'row: {dofs}')
-                    print(f'col: {[dof] * n_dofs_cell}')
-                    # print(f'row: {row_idx}')
-                    # print(f'col: {col_idx}')
-                    print('-' * 80)
         return row_idx, col_idx
 
+from scipy.spatial import Delaunay
 
 def generate_grid(lcar=0.1):
+    """
+    Generate simple 2D grid
+    
+    :param      lcar:  characteristic length
+    :type       lcar:  float
+    
+    :returns:   An instance of the Grid class
+    :rtype:     Grid
+    """
     with pygmsh.geo.Geometry() as geom:
-        # origin = geom.add_point([0.0, 0.0], lcar)
-        # p0 = geom.add_point([1.0, 0.0], lcar)
-        # p1 = geom.add_point([2.0, 0.0], lcar)
-        # p2 = geom.add_point([2.0, 5.0], lcar)
-        # p3 = geom.add_point([0.0, 5.0], lcar)
-        # p4 = geom.add_point([0.0, 1.0], lcar)
-
-        # a0 = geom.add_circle_arc(p0, origin, p4)
-        # l0 = geom.add_line(p0, p1) 
-        # l1 = geom.add_line(p1, p2)
-        # l2 = geom.add_line(p2, p3)
-        # l3 = geom.add_line(p3, p4)
-
-        # loop = geom.add_curve_loop([l0, l1, l2, l3, a0])
-        # surface = geom.add_plane_surface(loop)
-        # geom.add_physical(a0, 'hole')
-        # geom.add_physical(l0, 'bottom')
-        # geom.add_physical(l1, 'right')
-        # geom.add_physical(l2, 'top')
-        # geom.add_physical(l3, 'left')
-        # mesh = geom.generate_mesh()
-
-
         p0 = geom.add_point([0.0, 0.0], lcar)
         p1 = geom.add_point([1.0, 0.0], lcar)
         p2 = geom.add_point([2.0, 0.0], lcar)
@@ -241,11 +224,23 @@ def generate_grid(lcar=0.1):
 
         mesh = geom.generate_mesh(dim=2)
 
-    cells = mesh.cells_dict['triangle']
-    # NOTE: The mesh is generated in 3D. Get only the first two coordinates
+    # NOTE: The mesh always has 3 dimensions. Get only the first two coordinates
     nodes = mesh.points[:, :2]
-    for node in mesh.points:
-        print(node)
+    cells = mesh.cells_dict['triangle']
+
+    # TODO: The origin is included in the mesh, but it shoudn't! See this Github
+    # issue: https://github.com/meshpro/pygmsh/issues/562. The following is a
+    # workaround to remove the origin node and decrease the nodeid of all cells
+    # following it, i.e. the origin was at index 19, so once removed the other
+    # nodes pointing at it in the cells need to be lowered by 1.
+    unconnected_nodes = []
+    for i, node in enumerate(nodes):
+        if np.allclose(node, 0):
+            unconnected_nodes.append(i)
+    for i in unconnected_nodes:
+        nodes = np.delete(nodes, i, axis=0)
+        cells[cells >= i] -= 1
+
     bottom_nodes = mesh.cell_sets_dict['bottom']['line']
     top_nodes = mesh.cell_sets_dict['top']['line']
     left_nodes = mesh.cell_sets_dict['left']['line']
@@ -255,72 +250,7 @@ def generate_grid(lcar=0.1):
                 'left': left_nodes,
                 'right': right_nodes
                 }
-    
-    # with pygmsh.geo.Geometry() as geom:
-    #     poly = geom.add_polygon(
-    #         [
-    #             [+0.0, +0.5],
-    #             [-0.1, +0.1],
-    #             [-0.5, +0.0],
-    #             [-0.1, -0.1],
-    #             [+0.0, -0.5],
-    #             [+0.1, -0.1],
-    #             [+0.5, +0.0],
-    #             [+0.1, +0.1],
-    #         ],
-    #         mesh_size=0.05,
-    #     )
 
-    #     geom.twist(
-    #         poly,
-    #         translation_axis=[0, 0, 1],
-    #         rotation_axis=[0, 0, 1],
-    #         point_on_axis=[0, 0, 0],
-    #         angle=np.pi / 3,
-    #     )
-    #     print('-' * 80)
-    #     print(geom)
-    #     print('-' * 80)
-    #     mesh = geom.generate_mesh()
-    mesh.write('test.vtk')
+    # mesh.write('test.vtk')
     basicfem_grid = Grid(nodes, cells, nodesets)
     return basicfem_grid
-
-
-# resolution = 0.01
-# # Channel parameters
-# L = 2.2
-# H = 0.41
-# c = [0.2, 0.2, 0]
-# r = 0.05
-
-# # Initialize empty geometry using the build in kernel in GMSH
-# geometry = pygmsh.geo.Geometry()
-# # Fetch model we would like to add data to
-# model = geometry.__enter__()
-# # Add circle
-# circle = model.add_circle(c, r, mesh_size=resolution)
-
-# # Add points with finer resolution on left side
-# points = [model.add_point((0, 0, 0), mesh_size=resolution),
-#           model.add_point((L, 0, 0), mesh_size=5*resolution),
-#           model.add_point((L, H, 0), mesh_size=5*resolution),
-#           model.add_point((0, H, 0), mesh_size=resolution)]
-
-# # Add lines between all points creating the rectangle
-# channel_lines = [model.add_line(points[i], points[i+1])
-#                  for i in range(-1, len(points)-1)]
-
-# # Create a line loop and plane surface for meshing
-# channel_loop = model.add_curve_loop(channel_lines)
-# plane_surface = model.add_plane_surface(channel_loop, holes=[circle.curve_loop])
-
-# # Call gmsh kernel before add physical entities
-# model.synchronize()
-
-# model.add_physical([plane_surface], 'Volume')
-# model.add_physical([channel_lines[0]], 'Inflow')
-# model.add_physical([channel_lines[2]], 'Outflow')
-# model.add_physical([channel_lines[1], channel_lines[3]], 'Walls')
-# model.add_physical(circle.curve_loop.curves, 'Obstacle')
-# mesh = geometry.generate_mesh(dim=2)

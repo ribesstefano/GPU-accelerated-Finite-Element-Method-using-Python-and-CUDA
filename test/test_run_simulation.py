@@ -154,22 +154,16 @@ def test_run_simulation_plate_with_hole():
     # Plot mesh
     # ==========================================================================
     # grid.plot()
+    # grid.plot(np.random.randn(len(grid.nodes))) # With colored rand nodal data
     # ==========================================================================
     # Naive global K assembly
     # ==========================================================================
     # Init global K matrix and f
-    I, J = dh.get_sparsity_pattern()
-    # K = scipy.sparse.coo_matrix((np.ones(len(I)), (I, J)))
-    # print(f'I:\n{I}')
-    # print(f'J:\n{J}')
-    # print(f'K:\n{K}')
-    # print(f'K:\n{K.todense()}')
-    # # plt.spy(K)
-    # # plt.show()
+    row_idx, col_idx = dh.get_sparsity_pattern()
     
-    # # subgraphs = group_vertexes([(a, b) for a, b in zip(I, J)])
-    # # for i, graph in enumerate(subgraphs):
-    # #     print(f'graph n.{i}: {graph}')
+    # # subgraphs = group_vertexes([(a, b) for a, b in zip(row_idx, col_idx)])
+    # # for row_idx, graph in enumerate(subgraphs):
+    # #     print(f'graph n.{row_idx}: {graph}')
 
     # n_parts = 8
     # n_cuts, membership = pymetis.part_graph(n_parts, adjacency=grid.cells)
@@ -194,13 +188,8 @@ def test_run_simulation_plate_with_hole():
     # # print(f'nodes_part_1: {nodes_part_1}')
 
 
-    K = scipy.sparse.csr_matrix((np.zeros(len(I)), (I, J)))
-    print(np.all(K.diagonal()) != 0)
-    print(K.diagonal())
-    # plt.spy(K)
-    # plt.savefig('sparse.png')
-    # plt.show()
-    f = np.zeros(len(I))
+    K = scipy.sparse.csr_matrix((np.zeros(len(row_idx)), (row_idx, col_idx)))
+    f = np.zeros(len(row_idx))
     # Init element matrices
     ndofs_cell = dh.get_ndofs_per_cell()
     ke = np.zeros((ndofs_cell, ndofs_cell), dtype=np.float32)
@@ -215,13 +204,15 @@ def test_run_simulation_plate_with_hole():
         re.fill(0.0)
         xe = grid.get_coordinates(cellid)
         dofs = dh.get_cell_dofs(cellid)
-        # print(f'{cellid:4d}) dofs (output coords.): {dofs} | nodeid (input coords.): {grid.get_nodes_in_cell(cellid)}')
         ue = a[dofs] # NOTE: Not relevant as input for linear elasticity
         weak_form.run_element_routine(ke, re, xe, ue)
         for i, dof_i in enumerate(dofs):
             f[dof_i] += re[i]
             for j, dof_j in enumerate(dofs):
                 K[dof_i, dof_j] += ke[i, j]
+    # plt.spy(K)
+    # # plt.savefig('sparse.png')
+    # plt.show()
     # ==========================================================================
     # Solve system
     # ==========================================================================
@@ -231,12 +222,6 @@ def test_run_simulation_plate_with_hole():
     # plt.show()
     f_glob = -K[free_dofs, :][:, prescribed_dofs] @ a[prescribed_dofs]
     a[free_dofs] = scipy.sparse.linalg.spsolve(K_glob, f_glob)
-    print(np.all(K_glob.diagonal()) != 0)
-    print(K_glob.diagonal())
-    print(K.shape)
-    for i, x in enumerate(K_glob.diagonal()):
-        if x == 0:
-            print(f'Zero value at element {i}x{i}')
 
 
 def profile_solvers():
