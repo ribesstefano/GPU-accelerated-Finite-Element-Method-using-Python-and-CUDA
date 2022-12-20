@@ -128,7 +128,6 @@ def test_run_simulation():
     stats.print_stats(100)
     stats.dump_stats('program.prof')
 
-
 import matplotlib.pyplot as plt
 import matplotlib.tri as tri
 
@@ -137,7 +136,7 @@ def test_run_simulation_plate_with_hole():
     # Define mesh
     # ==========================================================================
     # grid = generate_grid(0.1) # Original
-    grid = generate_grid(lcar=0.8)
+    grid = generate_grid(lcar=0.5)
     dh = DofHandler(n_dofs_per_node=2, grid=grid)
     # ==========================================================================
     # Define a and prescribe DoFs
@@ -155,39 +154,58 @@ def test_run_simulation_plate_with_hole():
     # ==========================================================================
     # grid.plot()
     # grid.plot(np.random.randn(len(grid.nodes))) # With colored rand nodal data
+
+    # ==========================================================================
+    # Graph Partitioning
+    # ==========================================================================
+    # # subgraphs = group_vertexes([(a, b) for a, b in zip(row_idx, col_idx)])
+    # # for row_idx, graph in enumerate(subgraphs):
+    # #     print(f'graph n.{row_idx}: {graph}')
+
+    n_parts = 2
+    n_cuts, membership = pymetis.part_graph(n_parts, adjacency=grid.cells)
+
+    print(f'n_nodes: {grid.get_num_cells() * grid.get_num_nodes_per_cell()}')
+    print(f'n_cells: {grid.get_num_cells()} (n_parts: {n_parts}) - Cells per part: {(grid.get_num_cells() / n_parts) / grid.get_num_cells() * 100}%')
+    print(f'n_cuts: {n_cuts}')
+
+    for part in range(n_parts):
+        cells_part = np.argwhere(np.array(membership) == part).ravel()
+        nodes_idx_part = np.unique(grid.cells[cells_part].flatten())
+        nodes_part = grid.nodes[nodes_idx_part]
+        print(f'len part n.{part}: {len(cells_part)} - Nodes: {nodes_idx_part} - cells: {cells_part}')
+
+        if part == 0:
+            print('nodes_part', nodes_part)
+            nodal_values = np.random.randn(len(nodes_part))
+            nodes_x = grid.nodes[:, 0]
+            nodes_y = grid.nodes[:, 1]
+            # if nodal_values is not None:
+            #     # Create an unstructured triangular grid instance
+            #     triangulation = tri.Triangulation(nodes_part[:, 0], nodes_part[:, 1], grid.cells[cells_part])
+            #     # Plot the contours
+            #     plt.tricontourf(triangulation, nodal_values)
+            #     plt.colorbar()
+            # Plot the finite element mesh
+            for element in grid.cells[cells_part]:
+                x = [nodes_x[element[i]] for i in range(len(element))]
+                y = [nodes_y[element[i]] for i in range(len(element))]
+                plt.fill(x, y, edgecolor='black', fill=False)
+            plt.axis('equal')
+            plt.show()
+
+    # Things to do:
+    #
+    # * Element routine kernel
+    # * Mapping from global node indexes to indexes in shared memory (on GPU)
+    # * Packing algorithm to generate indexes of elements to be reduced
+    # * Reduction kernel over the indexes in shared memory
+
     # ==========================================================================
     # Naive global K assembly
     # ==========================================================================
     # Init global K matrix and f
     row_idx, col_idx = dh.get_sparsity_pattern()
-    
-    # # subgraphs = group_vertexes([(a, b) for a, b in zip(row_idx, col_idx)])
-    # # for row_idx, graph in enumerate(subgraphs):
-    # #     print(f'graph n.{row_idx}: {graph}')
-
-    # n_parts = 8
-    # n_cuts, membership = pymetis.part_graph(n_parts, adjacency=grid.cells)
-    # # n_cuts = 3
-    # # membership = [1, 1, 1, 0, 1, 0, 0]
-
-    # print(f'n_cells: {grid.get_num_cells()} (n_parts: {n_parts}) {(grid.get_num_cells() / n_parts) / grid.get_num_cells() * 100}')
-
-    # for part in range(n_parts):
-    #     cells_part = np.argwhere(np.array(membership) == part).ravel()
-    #     print(f'len part n.{part}: {len(cells_part)}')
-
-    #     # print(f'len: {len(cells_part)}) cells_part_{part}: {cells_part} = [', end='')
-    #     # for cellid in cells_part:
-    #     #     print(f'{grid.get_nodes_in_cell(cellid)}, ', end='')
-    #     # print(']')
-
-    # # nodes_part_0 = np.argwhere(np.array(membership) == 0).ravel() # [3, 5, 6]
-    # # nodes_part_1 = np.argwhere(np.array(membership) == 1).ravel() # [0, 1, 2, 4]
-
-    # # print(f'nodes_part_0: {nodes_part_0}')
-    # # print(f'nodes_part_1: {nodes_part_1}')
-
-
     K = scipy.sparse.csr_matrix((np.zeros(len(row_idx)), (row_idx, col_idx)))
     f = np.zeros(len(row_idx))
     # Init element matrices

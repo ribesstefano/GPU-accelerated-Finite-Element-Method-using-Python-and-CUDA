@@ -111,7 +111,7 @@ class DofHandler:
         """
         self.n_dofs_per_node = n_dofs_per_node
         self.grid = grid
-        self.all_dofs = {}
+        self.cells_dofs = np.array([self.get_cell_dofs(c) for c in range(grid.get_num_cells())], dtype=np.int32)
 
     def ndofs_total(self, grid):
         n_nodes = grid.nodes.shape[0]
@@ -166,7 +166,6 @@ class DofHandler:
         for i, nodeid in enumerate(self.grid.cells[cellid]):
             for d in range(n_dofs):
                 dofs[i * n_dofs + d] = nodeid * n_dofs + d
-                self.all_dofs[nodeid * n_dofs + d] = None
         return dofs
 
     def get_nodes_dofs(self, node_ids):
@@ -233,6 +232,7 @@ def generate_grid(lcar=0.1):
     # workaround to remove the origin node and decrease the nodeid of all cells
     # following it, i.e. the origin was at index 19, so once removed the other
     # nodes pointing at it in the cells need to be lowered by 1.
+    # TODO: The following can be for sure vectorized in numpy...
     unconnected_nodes = []
     for i, node in enumerate(nodes):
         if np.allclose(node, 0):
