@@ -176,15 +176,20 @@ class DofHandler:
                 dofs[i, d] = nodeid * n + d
         return dofs
 
-    def get_sparsity_pattern(self):
+    def get_sparsity_pattern(self, return_shape=False):
         n_dofs_cell = self.get_ndofs_per_cell()
         row_idx, col_idx = [], []
+        dim = -1
         for cellid in range(self.grid.get_num_cells()):
             dofs = self.get_cell_dofs(cellid)
+            dim = max(dim, max(dofs) + 1)
             for dof in dofs:
                 row_idx.extend(dofs)
                 col_idx.extend([dof] * n_dofs_cell)
-        return row_idx, col_idx
+        if return_shape:
+            return row_idx, col_idx, (dim, dim)
+        else:
+            return row_idx, col_idx
 
 from scipy.spatial import Delaunay
 
