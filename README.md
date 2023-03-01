@@ -1,8 +1,8 @@
-<a target="_blank" href="https://colab.research.google.com/github/ribesstefano/GPU-accelerated-Finite-Element-Method-using-Python-and-CUDA/blob/8e681149dd77ca31f6bf4182264a5f185e3beae9/TRA105_GPU_accelerated_Computational_Methods_using_Python_and_CUDA.ipynb">
+<a target="_blank" href="https://colab.research.google.com/github/ribesstefano/GPU-accelerated-Finite-Element-Method-using-Python-and-CUDA/blob/1c7395e6288f3b205421963411e4e57eb7e34f0f/TRA105_GPU_accelerated_Computational_Methods_using_Python_and_CUDA.ipynb">
   <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
 </a>
 
-# GPU Computing with Python - FEM
+# GPU-accelerated Finite Element Method using Python and CUDA
 
 This repository includes the work done within the course _TRA105 - GPU-accelerated Computational Methods using Python and CUDA_, held at Chalmers University.
 The main contributions are given by [Stefano Ribes](mailto:ribes.stefano@gmail.com), who developed all the high performance code, [Kim Louisa Auth](mailto:kim.auth@chalmers.se), who wrote an initial version of the FEM algorithm, and [Fredrik Larsson](mailto:Fredrik.Larsson@chalmers.se), who supervised the project.
