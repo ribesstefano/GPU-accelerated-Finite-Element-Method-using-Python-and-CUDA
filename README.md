@@ -1,6 +1,6 @@
 <a target="_blank" href="https://colab.research.google.com/github/ribesstefano/GPU-accelerated-Finite-Element-Method-using-Python-and-CUDA/blob/1c7395e6288f3b205421963411e4e57eb7e34f0f/TRA105_GPU_accelerated_Computational_Methods_using_Python_and_CUDA.ipynb">
   <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
-</a>
+</a> <a href="https://zenodo.org/badge/latestdoi/577767935"><img src="https://zenodo.org/badge/577767935.svg" alt="DOI"></a>
 
 # GPU-accelerated Finite Element Method using Python and CUDA
 
@@ -50,6 +50,7 @@ If you found this repository useful, please cite it via:
 @software{GPU-accelerated-Finite-Element-Method-using-Python-and-CUDA,
   author = {Stefano Ribes, Kim Louisa Auth, Fredrik Larsson},
   title = {{GPU-accelerated Finite Element Method using Python and CUDA}},
+  doi = {https://doi.org/10.5281/zenodo.7688742},
   url = {https://github.com/ribesstefano/GPU-accelerated-Finite-Element-Method-using-Python-and-CUDA.git},
   version = {1.0.0},
   year = {2023}
