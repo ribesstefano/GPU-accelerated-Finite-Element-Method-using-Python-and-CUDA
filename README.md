@@ -44,3 +44,14 @@ As expected, the GPU implementation is clearly superior in terms of performance,
 
 The aforementioned notebook contains a more in-depth description and analysis of the proposed designs. It also includes additional notes and future work proposals.
 
+If you found this repository useful, please cite it via:
+
+```
+@software{GPU-accelerated-Finite-Element-Method-using-Python-and-CUDA,
+  author = {Stefano Ribes, Kim Louisa Auth, Fredrik Larsson},
+  title = {{GPU-accelerated Finite Element Method using Python and CUDA}},
+  url = {https://github.com/ribesstefano/GPU-accelerated-Finite-Element-Method-using-Python-and-CUDA.git},
+  version = {1.0.0},
+  year = {2023}
+}
+```
