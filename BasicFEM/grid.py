@@ -78,10 +78,10 @@ class Grid:
         nodes_x = self.nodes[:, 0]
         nodes_y = self.nodes[:, 1]
         if nodal_values is not None:
-            # Create an unstructured triangular grid instance
-            triangulation = tri.Triangulation(nodes_x, nodes_y, self.cells)
-            # Plot the contours
-            plt.tricontourf(triangulation, nodal_values)
+            # Average nodal response per cell
+            z = [nodal_values[cell].mean() for cell in self.cells]
+            plt.tripcolor(nodes_x, nodes_y, triangles=self.cells, facecolors=z,
+                          shading='flat', edgecolors='k')
             plt.colorbar()
         # Plot the finite element mesh
         for element in self.cells:
